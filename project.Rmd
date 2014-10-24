@@ -1,0 +1,78 @@
+---
+title: "WLE Prediction"
+author: "Hidetoshi Tobita"
+date: "Saturday, October 25, 2014"
+output: html_document
+---
+The data for this project come from this source: http://groupware.les.inf.puc-rio.br/har. The goal of our project is to predict the manner in which they did the exercise. This is the "classe" variable in the training set. 
+
+Initialize the environment and load the data set.
+```{r}
+rm(list=ls())  #clear environment at first
+set.seed(141024) #set global seed
+library(caret) #use caret 
+training <- read.csv("pml-training.csv", header=TRUE)
+testing <- read.csv("pml-testing.csv", header=TRUE)
+```
+
+Preprocess the data set with only predictors related to outcome ("classe")
+```{r}
+trainVar <- c(
+"user_name",
+"roll_belt", "pitch_belt", "yaw_belt",
+"gyros_belt_x", "gyros_belt_y", "gyros_belt_z",
+"accel_belt_x", "accel_belt_y", "accel_belt_z",          
+"magnet_belt_x", "magnet_belt_y", "magnet_belt_z",           
+"roll_arm", "pitch_arm", "yaw_arm",                
+"gyros_arm_x", "gyros_arm_y", "gyros_arm_z", 
+"accel_arm_x", "accel_arm_y", "accel_arm_z",
+"magnet_arm_x", "magnet_arm_y", "magnet_arm_z",
+"roll_dumbbell", "pitch_dumbbell", "yaw_dumbbell",
+"gyros_dumbbell_x", "gyros_dumbbell_y", "gyros_dumbbell_z",
+"accel_dumbbell_x", "accel_dumbbell_y", "accel_dumbbell_z",
+"magnet_dumbbell_x", "magnet_dumbbell_y", "magnet_dumbbell_z",
+"roll_forearm", "pitch_forearm", "yaw_forearm",
+"gyros_forearm_x", "gyros_forearm_y", "gyros_forearm_z",         
+"accel_forearm_x", "accel_forearm_y", "accel_forearm_z",         
+"magnet_forearm_x", "magnet_forearm_y", "magnet_forearm_z",        
+"classe"                  
+)
+testVar <-trainVar
+testVar[length(testVar)] <- "problem_id" 
+trainData <- training[ , trainVar]
+testData <- testing[ , testVar]
+```
+
+Partition the trainData into it's training and testing data.
+Due to my computer's poor capability, the training part is set to 10% of trainData 
+where it should be set to 60% or greater. Fortunately it works well!
+```{r}
+inTrain <- createDataPartition(y=trainData$classe, p=0.1, list=FALSE)
+trainTrain <- trainData[inTrain,]
+trainTest <- trainData[-inTrain,]
+```
+
+Fit the classfication model using random forest method with cross validation. So the cross varidation is done in train function and the most optimal model is selected based on the Accuracy value.
+It will take a while.
+```{r}
+modFit <- train(classe ~ ., data=trainTrain[ ,-1], method="rf", prox=TRUE, 
+                trControl=trainControl(method="cv")) 
+```
+
+The resulted model is summarized below. The expected out of sample error is 5.24%.
+```{r}
+modFit
+modFit$finalModel
+```
+
+Predict the classes of trainTest data to evaluate. The detail error measures are shown below.
+```{r}
+pred <- predict(modFit,  newdata=trainTest[, -1])
+confusionMatrix(pred, trainTest[ , "classe"])
+```
+
+Finally, predict the classes of testData, that is the goal of our project.
+```{r}
+testDataPred <- predict(modFit, newdata=testData[, -1])
+data.frame(problem_id=testData$problem_id, classe=testDataPred)
+```
